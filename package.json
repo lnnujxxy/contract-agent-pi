@@ -1,0 +1,26 @@
+{
+  "name": "contract-agent-pi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test 'test/**/*.test.ts'",
+    "review": "tsx src/cli.ts",
+    "tui": "tsx src/tui.ts",
+    "web": "tsx src/web-main.ts"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "0.84.2",
+    "@earendil-works/pi-ai": "0.84.2",
+    "@earendil-works/pi-tui": "0.84.2",
+    "mammoth": "^1.12.1",
+    "pdf-parse": "^2.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}
