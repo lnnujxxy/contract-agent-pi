@@ -5,6 +5,7 @@ import type { AgentEvent } from "@earendil-works/pi-agent-core";
 
 import type { CliOptions } from "./cli-options.js";
 import { formatReportMarkdown } from "./report.js";
+import { loadReviewPrompts, reviewPromptDirectory } from "./review-prompts.js";
 import { createContractRuntime } from "./runtime.js";
 
 export interface RunReviewOptions extends CliOptions {
@@ -14,19 +15,19 @@ export interface RunReviewOptions extends CliOptions {
 export async function runReview(options: RunReviewOptions): Promise<{ jsonPath: string; markdownPath: string }> {
   const contractPath = resolve(options.contractPath);
   const contractRoot = dirname(contractPath);
+  const prompts = await loadReviewPrompts(reviewPromptDirectory(), contractPath);
   const runtime = createContractRuntime({
     contractRoot,
     provider: options.provider,
     model: options.model,
+    systemPrompt: prompts.systemPrompt,
     onAudit: (event) => {
       if (!event.allowed) process.stderr.write(`[safety] ${event.toolName}: ${event.reason ?? "blocked"}\n`);
     },
   });
   if (options.onEvent) runtime.agent.subscribe(options.onEvent);
 
-  await runtime.agent.prompt(
-    `请审查合同 ${contractPath}。严格按系统规定逐块读取，完成后必须调用 submit_contract_review。`,
-  );
+  await runtime.agent.prompt(prompts.taskPrompt);
   if (!runtime.state.report) {
     throw new Error(runtime.agent.state.errorMessage ?? "Agent finished without submitting a structured review report");
   }
