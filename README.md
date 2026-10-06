@@ -2,17 +2,6 @@
 
 本地运行的合同审查 Agent。它使用 pi-mono 的统一模型层、Agent Runtime、工具调用、事件流和 TUI，并把合同读取限制在指定目录内。
 
-## 课程主线到本项目的映射
-
-| 讲次 | 课程主题 | 本项目实现 |
-| --- | --- | --- |
-| 15 | 最小 Agent Runtime | `src/runtime.ts`：`Agent` + `pi-ai` 模型层 + 事件订阅 |
-| 16 | 工具接口与结构化输出 | `src/tools.ts`：文档读取、分类、分块、结构化报告工具 |
-| 17 | 长上下文与 Skill | `src/chunking.ts` + `.pi/skills/contract-risk-review/` |
-| 18 | 多层安全护栏 | 路径白名单、PII 脱敏、`beforeToolCall` / `afterToolCall` 拦截 |
-| 19 | ChatPanel / Web 接入 | 原生 Web Component、文件上传、SSE、权限预检和沙盒报告 |
-| 20 | pi-tui | `src/tui.ts`：工具进度与模型事件流的差分渲染 |
-
 ## 架构
 
 ```text
