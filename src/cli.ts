@@ -1,5 +1,6 @@
 import { parseCliOptions } from "./cli-options.js";
 import { loadLocalEnv } from "./env-loader.js";
+import { defaultReviewInstruction } from "./review-instruction.js";
 import { runReview } from "./run-review.js";
 import { formatAgentEvent } from "./ui-events.js";
 
@@ -9,6 +10,7 @@ async function main(): Promise<void> {
   const options = parseCliOptions(process.argv.slice(2));
   const result = await runReview({
     ...options,
+    instruction: defaultReviewInstruction(),
     onEvent(event) {
       const formatted = formatAgentEvent(event);
       if (!formatted) return;

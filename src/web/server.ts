@@ -5,11 +5,12 @@ import { basename, extname, join, resolve } from "node:path";
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
 
 import { parseCliOptions } from "../cli-options.js";
+import { isContractFormat } from "../domain.js";
+import { parseReviewInstruction, type ReviewInstruction } from "../review-instruction.js";
 import { runReview, type RunReviewOptions } from "../run-review.js";
 import { assertPathInsideRoot } from "../security.js";
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
-const SUPPORTED_EXTENSIONS = new Set([".pdf", ".docx", ".txt", ".md"]);
 
 export interface SsePacket {
   event: string;
@@ -23,16 +24,31 @@ export interface ContractWebServerOptions {
   workspaceRoot?: string;
 }
 
+export interface WebChatRequest {
+  instruction: ReviewInstruction;
+  filePath: string;
+}
+
+export function parseWebChatBody(value: unknown): WebChatRequest {
+  if (typeof value !== "object" || value === null) throw new Error("message and filePath are required");
+  const body = value as { message?: unknown; filePath?: unknown };
+  if (typeof body.filePath !== "string" || body.filePath.trim() === "") {
+    throw new Error("message and filePath are required");
+  }
+  return { instruction: parseReviewInstruction(body.message), filePath: body.filePath };
+}
+
 export function sanitizeUploadName(input: string): string {
   const original = basename(input.normalize("NFKC"));
-  const extension = extname(original).toLocaleLowerCase();
-  if (!SUPPORTED_EXTENSIONS.has(extension)) throw new Error(`Unsupported contract format: ${extension || "unknown"}`);
-  const stem = basename(original, extension)
+  const originalExtension = extname(original);
+  const extension = originalExtension.slice(1).toLocaleLowerCase();
+  if (!isContractFormat(extension)) throw new Error(`Unsupported contract format: ${extension || "unknown"}`);
+  const stem = basename(original, originalExtension)
     .replace(/\s+/g, "-")
     .replace(/[^\p{L}\p{N}._-]/gu, "")
     .replace(/^-+|-+$/g, "");
   if (!stem) throw new Error("Upload filename is empty after sanitization");
-  return `${stem}${extension}`;
+  return `${stem}.${extension}`;
 }
 
 export function mapAgentEventToSse(event: AgentEvent): SsePacket | undefined {
@@ -109,15 +125,8 @@ export function createContractWebServer(options: ContractWebServerOptions = {}) 
       }
 
       if (request.method === "POST" && url.pathname === "/api/chat") {
-        const body = JSON.parse((await readBody(request, 256 * 1024)).toString("utf8")) as {
-          message?: unknown;
-          filePath?: unknown;
-        };
-        if (typeof body.message !== "string" || typeof body.filePath !== "string") {
-          sendJson(response, 400, { error: "message and filePath are required" });
-          return;
-        }
-        const filePath = assertPathInsideRoot(uploadsRoot, body.filePath);
+        const chat = parseWebChatBody(JSON.parse((await readBody(request, 256 * 1024)).toString("utf8")));
+        const filePath = assertPathInsideRoot(uploadsRoot, chat.filePath);
         const modelOptions = parseCliOptions([filePath]);
         response.writeHead(200, {
           "content-type": "text/event-stream; charset=utf-8",
@@ -128,6 +137,7 @@ export function createContractWebServer(options: ContractWebServerOptions = {}) 
         sendSse(response, { event: "status", data: { text: "合同已进入本地审查管道" } });
         const result = await reviewRunner({
           ...modelOptions,
+          instruction: chat.instruction,
           outputBase: join(reportsRoot, `web-review-${Date.now()}`),
           onEvent(event) {
             const packet = mapAgentEventToSse(event);
