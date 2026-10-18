@@ -6,7 +6,14 @@ import { Type } from "@earendil-works/pi-ai";
 
 import { chunkContract } from "./chunking.js";
 import { classifyContract } from "./classifier.js";
-import type { ContractChunk, ContractClassification, ContractDocument, ReviewReport } from "./domain.js";
+import {
+  CONTRACT_TYPES,
+  RISK_LEVELS,
+  type ContractChunk,
+  type ContractClassification,
+  type ContractDocument,
+  type ReviewReport,
+} from "./domain.js";
 import { readContractDocument } from "./document-reader.js";
 import { redactSensitiveText } from "./security.js";
 
@@ -24,22 +31,12 @@ export interface ContractToolOptions {
   skillPath?: string;
 }
 
-const RiskLevelSchema = Type.Union([
-  Type.Literal("critical"),
-  Type.Literal("high"),
-  Type.Literal("medium"),
-  Type.Literal("low"),
-]);
+function literalUnion<const T extends readonly [string, string, ...string[]]>(values: T) {
+  return Type.Union(values.map((value) => Type.Literal(value)));
+}
 
-const ContractTypeSchema = Type.Union([
-  Type.Literal("software_service"),
-  Type.Literal("procurement"),
-  Type.Literal("employment"),
-  Type.Literal("lease"),
-  Type.Literal("confidentiality"),
-  Type.Literal("sales"),
-  Type.Literal("unknown"),
-]);
+const RiskLevelSchema = literalUnion(RISK_LEVELS);
+const ContractTypeSchema = literalUnion(CONTRACT_TYPES);
 
 const ReviewReportSchema = Type.Object({
   contractType: ContractTypeSchema,

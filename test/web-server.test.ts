@@ -8,6 +8,7 @@ import { createContractWebServer, mapAgentEventToSse, sanitizeUploadName } from 
 
 test("sanitizes uploaded contract filenames", () => {
   assert.equal(sanitizeUploadName("../../客户 合同.pdf"), "客户-合同.pdf");
+  assert.equal(sanitizeUploadName("Contract.PDF"), "Contract.pdf");
   assert.throws(() => sanitizeUploadName("payload.exe"), /unsupported contract format/i);
 });
 
@@ -23,8 +24,12 @@ test("maps pi-mono events to browser-friendly SSE packets", () => {
 });
 
 test("serves the ChatPanel, accepts uploads and streams review events", async (context) => {
+  let reviewCalls = 0;
+  let instruction = "";
   const server = createContractWebServer({
     async reviewRunner(options) {
+      reviewCalls += 1;
+      instruction = options.instruction.text;
       options.onEvent?.({
         type: "message_update",
         assistantMessageEvent: { type: "text_delta", delta: "正在审查", contentIndex: 0, partial: {} },
@@ -51,12 +56,28 @@ test("serves the ChatPanel, accepts uploads and streams review events", async (c
   const uploaded = (await upload.json()) as { filePath: string };
   assert.match(uploaded.filePath, /uploads\/demo-contract\.txt$/);
 
+  const blank = await fetch(`${baseUrl}/api/chat`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message: "   ", filePath: uploaded.filePath }),
+  });
+  assert.equal(blank.status, 400);
+  const outside = await fetch(`${baseUrl}/api/chat`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message: "请审查", filePath: "/etc/passwd" }),
+  });
+  assert.equal(outside.status, 400);
+  assert.equal(reviewCalls, 0);
+
   const chat = await fetch(`${baseUrl}/api/chat`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ message: "请审查", filePath: uploaded.filePath }),
+    body: JSON.stringify({ message: "请从甲方视角审查", filePath: uploaded.filePath }),
   });
   const stream = await chat.text();
+  assert.equal(instruction, "请从甲方视角审查");
+  assert.equal(reviewCalls, 1);
   assert.match(stream, /"event":"message_delta"/);
   assert.match(stream, /"event":"report"/);
   assert.match(stream, /"event":"done"/);

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import { CONTRACT_TYPES, RISK_LEVELS } from "../src/domain.js";
 import { createContractTools } from "../src/tools.js";
 
 test("tool chain loads, classifies and chunks a contract without leaking raw text in details", async () => {
@@ -63,4 +64,13 @@ test("review skill and submit tool produce a structured final report", async () 
 
   assert.equal(result.terminate, true);
   assert.deepEqual(state.report, report);
+});
+
+test("submit schema stays aligned with domain contract types and risk levels", () => {
+  const { tools } = createContractTools({ contractRoot: "/tmp/contracts" });
+  const submit = tools.find((tool) => tool.name === "submit_contract_review");
+  assert.ok(submit);
+  const encoded = JSON.stringify(submit.parameters);
+  for (const type of CONTRACT_TYPES) assert.match(encoded, new RegExp(`"${type}"`));
+  for (const level of RISK_LEVELS) assert.match(encoded, new RegExp(`"${level}"`));
 });
